@@ -34,6 +34,8 @@
       "@ember-data/record-data/*": ["packages/record-data/addon/*"],
       "@ember-data/canary-features": ["packages/canary-features/addon"],
       "@ember-data/canary-features/*": ["packages/canary-features/addon/*"],
+      "@ember-data/network": ["packages/network/addon"],
+      "@ember-data/network/*": ["packages/network/addon/*"],
       "*": ["packages/store/types/*", "packages/record-data/types/*"]
     }
   },
