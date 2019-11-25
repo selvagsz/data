@@ -1,6 +1,8 @@
 type Snapshot = import('../system/snapshot').default;
+type SnapshotRecordArray = import('../system/snapshot-record-array').default;
 type Store = import('../system/core-store').default;
-type ShimModelClass = import('../system/model/shim-model-class').default;
+type ModelSchema = import('../ts-interfaces/ds-model').ModelSchema;
+
 import { Dict } from './utils';
 
 type OptionsHash = Dict<any>;
@@ -98,19 +100,43 @@ type OptionsHash = Dict<any>;
 */
 type Group = Snapshot[];
 interface Adapter {
-  findRecord(store: Store, schema: ShimModelClass, id: string, snapshot: Snapshot): Promise<unknown>;
-  findAll(store: Store, schema: ShimModelClass, sinceToken: null, snapshotRecordArray): Promise<unknown>;
-  query(Store: Store, schema: ShimModelClass, query, recordArray, options): Promise<unknown>;
-  queryRecord(store: Store, schema: ShimModelClass, query, options): Promise<unknown>;
+  /**
+   * `adapter.findRecord` takes a request for a resource of a given `type` and `id` combination
+   * and should return a promise which fulfills with resource data matching that `type` and `id`.
+   *
+   * The response will be fed to the associated serializer's `normalizeResponse` method with the
+   * `requestType` set to `findRecord`.
+   *
+   * `adapter.findRecord` is called whenever the `store` needs to load, reload, or backgroundReload
+   * the resource data for a given `type` and `id`.
+   *
+   * @method findRecord
+   * @param {Store} store
+   * @param {ModelSchema} schema
+   * @param {String} id
+   * @param {Snapshot} snapshot
+   */
+  findRecord(store: Store, schema: ModelSchema, id: string, snapshot: Snapshot): Promise<unknown>;
 
-  createRecord(store: Store, schema: ShimModelClass, snapshot: Snapshot): Promise<unknown>;
-  updateRecord(store: Store, schema: ShimModelClass, snapshot: Snapshot): Promise<unknown>;
-  deleteRecord(store: Store, schema: ShimModelClass, snapshot: Snapshot): Promise<unknown>;
+  /**
+   *
+   * @param {Store} store
+   * @param {ModelSchema} schema
+   * @param {null} sinceToken This parameter is no longer used and will always be null.
+   * @param snapshotRecordArray
+   */
+  findAll(store: Store, schema: ModelSchema, sinceToken: null, snapshotRecordArray): Promise<unknown>;
+  query(Store: Store, schema: ModelSchema, query, recordArray, options): Promise<unknown>;
+  queryRecord(store: Store, schema: ModelSchema, query, options): Promise<unknown>;
+
+  createRecord(store: Store, schema: ModelSchema, snapshot: Snapshot): Promise<unknown>;
+  updateRecord(store: Store, schema: ModelSchema, snapshot: Snapshot): Promise<unknown>;
+  deleteRecord(store: Store, schema: ModelSchema, snapshot: Snapshot): Promise<unknown>;
 
   findBelongsTo?(store: Store, snapshot: Snapshot, relatedLink: string, relationship): Promise<unknown>;
   findHasMany?(store: Store, snapshot: Snapshot, relatedLink: string, relationship): Promise<unknown>;
   generateIdForRecord?(store: Store, modelName: string, properties: unknown): string;
-  findMany?(store: Store, schema: ShimModelClass, ids: string[], snapshots): Promise<unknown>;
+  findMany?(store: Store, schema: ModelSchema, ids: string[], snapshots): Promise<unknown>;
   groupRecordsForFindMany?(store: Store, snapshots): Group[];
   shouldReloadRecord?(store: Store, snapshot: Snapshot): boolean;
   shouldReloadAll?(store: Store, snapshotArray): boolean;
