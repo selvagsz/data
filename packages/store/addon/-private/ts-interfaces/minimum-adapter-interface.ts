@@ -116,6 +116,9 @@ interface Adapter {
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
    *
+   * The final result after normalization to `JSON:API` will be added to store via `store.push` where
+   * it will merge with any existing data for the record.
+   *
    * @method findRecord
    * @public
    * @param {Store} store
@@ -140,6 +143,9 @@ interface Adapter {
    * ⚠️ If the adapter's response resolves to a false-y value, the associated `serializer.normalizeResponse`
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
+   *
+   * The final result after normalization to `JSON:API` will be added to store via `store.push` where
+   * it will merge with any existing records for `type`. Existing records for the `type` will not be removed.
    *
    * @method findAll
    * @public
@@ -167,7 +173,9 @@ interface Adapter {
    * `adapter.query` is called whenever `store.query` is called or a previous query result is
    * asked to reload.
    *
-   * As with `findAll`, the records in the response are merged with the contents of the store.
+   * As with `findAll`, the final result after normalization to `JSON:API` will be added to
+   * store via `store.push` where it will merge with any existing records for `type`.
+   *
    * Existing records for the `type` will not be removed. The key difference is in the result
    * returned by the `store`. For `findAll` the result is all known records of the `type`,
    * while for `query` it will only be the records returned from `adapter.query`.
@@ -204,6 +212,9 @@ interface Adapter {
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
    *
+   * The final result after normalization to `JSON:API` will be added to store via `store.push` where
+   * it will merge with any existing data for the returned record.
+   *
    * @method queryRecord
    * @public
    * @param {Store} store
@@ -225,9 +236,14 @@ interface Adapter {
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
    *
-   * @param store
-   * @param schema
-   * @param snapshot
+   * The final result after normalization to `JSON:API` will be added to store via `store.push` where
+   * it will merge with any existing data for the record.
+   *
+   * @method createRecord
+   * @public
+   * @param {Store} store
+   * @param {ModelSchema} schema
+   * @param {Snapshot} snapshot
    * @return {Promise} a promise resolving with resource data to feed to the associated serializer
    */
   createRecord(store: Store, schema: ModelSchema, snapshot: Snapshot): Promise<unknown>;
@@ -243,9 +259,11 @@ interface Adapter {
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
    *
-   * @param store
-   * @param schema
-   * @param snapshot
+   * @method updateRecord
+   * @public
+   * @param {Store} store
+   * @param {ModelSchema} schema
+   * @param {Snapshot} snapshot
    */
   updateRecord(store: Store, schema: ModelSchema, snapshot: Snapshot): Promise<unknown>;
 
@@ -263,9 +281,11 @@ interface Adapter {
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
    *
-   * @param store
-   * @param schema
-   * @param snapshot
+   * @method deleteRecord
+   * @public
+   * @param {Store} store
+   * @param {ModelSchema} schema
+   * @param {Snapshot} snapshot
    */
   deleteRecord(store: Store, schema: ModelSchema, snapshot: Snapshot): Promise<unknown>;
 
@@ -328,21 +348,88 @@ interface Adapter {
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
    *
-   * @param store
+   * @method findMany [OPTIONAL]
+   * @public
+   * @optional
+   * @param {Store} store
    * @param schema
    * @param ids
    * @param snapshots
    */
   findMany?(store: Store, schema: ModelSchema, ids: string[], snapshots: Snapshot[]): Promise<unknown>;
 
+  /**
+   *
+   * @method generateIdForRecord [OPTIONAL]
+   * @public
+   * @optional
+   * @param {Store} store
+   * @param modelName
+   * @param properties
+   */
   generateIdForRecord?(store: Store, modelName: string, properties: unknown): string;
+
+  /**
+   *
+   * @method groupRecordsForFindMany [OPTIONAL]
+   * @public
+   * @optional
+   * @param {Store} store
+   * @param snapshots
+   */
   groupRecordsForFindMany?(store: Store, snapshots: Snapshot[]): Group[];
 
+  /**
+   *
+   * @method shouldReloadRecord [OPTIONAL]
+   * @public
+   * @optional
+   * @param {Store} store
+   * @param {Snapshot} snapshot
+   * @return {boolean} true if the record should be reloaded immediately, false otherwise
+   */
   shouldReloadRecord?(store: Store, snapshot: Snapshot): boolean;
+
+  /**
+   *
+   * @method shouldReloadAll [OPTIONAL]
+   * @public
+   * @optional
+   * @param {Store} store
+   * @param {Snapshot} snapshot
+   * @return {boolean} true if the a new request for all records of the type in SnapshotRecordArray should be made immediately, false otherwise
+   */
   shouldReloadAll?(store: Store, snapshotArray: SnapshotRecordArray): boolean;
+
+  /**
+   *
+   * @method shouldBackgroundReloadRecord [OPTIONAL]
+   * @public
+   * @optional
+   * @param {Store} store
+   * @param {Snapshot} snapshot
+   * @return {boolean} true if the record should be reloaded in the background, false otherwise
+   */
   shouldBackgroundReloadRecord?(store: Store, snapshot: Snapshot): boolean;
+
+  /**
+   *
+   * @method shouldBackgroundReloadAll [OPTIONAL]
+   * @public
+   * @optional
+   * @param {Store} store
+   * @param {Snapshot} snapshot
+   * @return {boolean} true if the a new request for all records of the type in SnapshotRecordArray should be made in the background, false otherwise
+   */
   shouldBackgroundReloadAll?(store: Store, snapshotArray: SnapshotRecordArray): boolean;
 
+  /**
+   *
+   * @property coalesceFindRequests [OPTIONAL]
+   * @public
+   * @optional
+   * @type {boolean} true if the requests to find individual records should be coalesced, false otherwise
+   */
   coalesceFindRequests?: boolean;
 }
 
