@@ -35,7 +35,50 @@ type Group = Snapshot[];
 
   ### Implementing an Adapter
 
-  // TODO
+  There are seven required adapter methods, one for each of
+  the primary request types that EmberData issues.
+
+  They are:
+
+  - findRecord
+  - findAll
+  - queryRecord
+  - query
+  - createRecord
+  - updateRecord
+  - deleteRecord
+
+  Each of these request types has a matching store method that triggers it
+  and matching `requestType` that is passed to the serializer's
+  `normalizeResponse` method.
+
+  If your app only reads data but never writes data, it is not necessary
+  to implement the methods for create, update, and delete.
+
+
+  data
+  normalizing data from the server API format into JSON:API, and
+  another for serializing records via `Snapshots` into the expected
+  server API format.
+
+  To implement a serializer, export a class that conforms to the structure
+  described by the [MinimumSerializerInterface](/ember-data/release/classes/MinimumSerializerInterface)
+  from the `app/serializers/` directory. An example is below.
+
+  ```ts
+  import EmberObject from '@ember/object';
+
+  async function fetchData(url, options = {}) {
+    let response = await fetch(`./${modelName}s/${id}`, options);
+    return response.toJSON();
+  }
+
+  export default class ApplicationAdapter extends EmberObject {
+    findRecord(_, { modelName }, id) {
+      return fetchData(`./${modelName}s/${id}`);
+    }
+  }
+  ```
 
   ### Adapter Resolution
 
@@ -109,20 +152,21 @@ interface Adapter {
    * The response will be fed to the associated serializer's `normalizeResponse` method with the
    * `requestType` set to `findRecord`.
    *
-   * `adapter.findRecord` is called whenever the `store` needs to load, reload, or backgroundReload
-   * the resource data for a given `type` and `id`.
-   *
    * ⚠️ If the adapter's response resolves to a false-y value, the associated `serializer.normalizeResponse`
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
+   *
+   * `adapter.findRecord` is called whenever the `store` needs to load, reload, or backgroundReload
+   * the resource data for a given `type` and `id`.
    *
    * The final result after normalization to `JSON:API` will be added to store via `store.push` where
    * it will merge with any existing data for the record.
    *
    * @method findRecord
    * @public
-   * @param {Store} store
-   * @param {ModelSchema} schema
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {ModelSchema} schema An object with methods for accessing information about
+   *  the type, attributes and relationships of the primary type associated with the request.
    * @param {String} id
    * @param {Snapshot} snapshot
    * @return {Promise} a promise resolving with resource data to feed to the associated serializer
@@ -136,21 +180,22 @@ interface Adapter {
    * The response will be fed to the associated serializer's `normalizeResponse` method
    *  with the `requestType` set to `findAll`.
    *
-   * `adapter.findAll` is called whenever `store.findAll` is asked to reload or backgroundReload.
-   * The records in the response are merged with the contents of the store. Existing records for
-   * the `type` will not be removed.
-   *
    * ⚠️ If the adapter's response resolves to a false-y value, the associated `serializer.normalizeResponse`
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
+   *
+   * `adapter.findAll` is called whenever `store.findAll` is asked to reload or backgroundReload.
+   * The records in the response are merged with the contents of the store. Existing records for
+   * the `type` will not be removed.
    *
    * The final result after normalization to `JSON:API` will be added to store via `store.push` where
    * it will merge with any existing records for `type`. Existing records for the `type` will not be removed.
    *
    * @method findAll
    * @public
-   * @param {Store} store
-   * @param {ModelSchema} schema
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {ModelSchema} schema An object with methods for accessing information about
+   *  the type, attributes and relationships of the primary type associated with the request.
    * @param {null} sinceToken This parameter is no longer used and will always be null.
    * @param {SnapshotRecordArray} snapshotRecordArray an object containing any passed in options,
    *  adapterOptions, and the ability to access a snapshot for each existing record of the type.
@@ -170,6 +215,10 @@ interface Adapter {
    * The response will be fed to the associated serializer's `normalizeResponse` method
    *  with the `requestType` set to `query`.
    *
+   * ⚠️ If the adapter's response resolves to a false-y value, the associated `serializer.normalizeResponse`
+   * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
+   * processing within the adapter.
+   *
    * `adapter.query` is called whenever `store.query` is called or a previous query result is
    * asked to reload.
    *
@@ -180,14 +229,11 @@ interface Adapter {
    * returned by the `store`. For `findAll` the result is all known records of the `type`,
    * while for `query` it will only be the records returned from `adapter.query`.
    *
-   * ⚠️ If the adapter's response resolves to a false-y value, the associated `serializer.normalizeResponse`
-   * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
-   * processing within the adapter.
-   *
    * @method query
    * @public
-   * @param {Store} store
-   * @param {ModelSchema} schema
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {ModelSchema} schema An object with methods for accessing information about
+   *  the type, attributes and relationships of the primary type associated with the request.
    * @param {object} query
    * @param {AdapterPopulatedRecordArray} recordArray
    * @param {object} options
@@ -217,8 +263,9 @@ interface Adapter {
    *
    * @method queryRecord
    * @public
-   * @param {Store} store
-   * @param {ModelSchema} schema
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {ModelSchema} schema An object with methods for accessing information about
+   *  the type, attributes and relationships of the primary type associated with the request.
    * @param query
    * @param options
    * @return {Promise} a promise resolving with resource data to feed to the associated serializer
@@ -241,8 +288,9 @@ interface Adapter {
    *
    * @method createRecord
    * @public
-   * @param {Store} store
-   * @param {ModelSchema} schema
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {ModelSchema} schema An object with methods for accessing information about
+   *  the type, attributes and relationships of the primary type associated with the request.
    * @param {Snapshot} snapshot
    * @return {Promise} a promise resolving with resource data to feed to the associated serializer
    */
@@ -261,8 +309,9 @@ interface Adapter {
    *
    * @method updateRecord
    * @public
-   * @param {Store} store
-   * @param {ModelSchema} schema
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {ModelSchema} schema An object with methods for accessing information about
+   *  the type, attributes and relationships of the primary type associated with the request.
    * @param {Snapshot} snapshot
    */
   updateRecord(store: Store, schema: ModelSchema, snapshot: Snapshot): Promise<unknown>;
@@ -283,9 +332,11 @@ interface Adapter {
    *
    * @method deleteRecord
    * @public
-   * @param {Store} store
-   * @param {ModelSchema} schema
-   * @param {Snapshot} snapshot
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {ModelSchema} schema An object with methods for accessing information about
+   *  the type, attributes and relationships of the primary type associated with the request.
+   * @param {Snapshot} snapshot A Snapshot containing the record's current data
+   * @return
    */
   deleteRecord(store: Store, schema: ModelSchema, snapshot: Snapshot): Promise<unknown>;
 
@@ -301,8 +352,8 @@ interface Adapter {
    * @method findBelongsTo [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
-   * @param {Snapshot} snapshot
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {Snapshot} snapshot A Snapshot containing the parent record's current data
    * @param {string} relatedLink
    * @param {object} relationship
    * @return {Promise} a promise resolving with resource data to feed to the associated serializer
@@ -326,8 +377,8 @@ interface Adapter {
    * @method findhasMany [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
-   * @param {Snapshot} snapshot
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {Snapshot} snapshot A Snapshot containing the parent record's current data
    * @param {string} relatedLink
    * @param {object} relationship
    * @return {Promise} a promise resolving with resource data to feed to the associated serializer
@@ -348,13 +399,17 @@ interface Adapter {
    * call will NOT be made. In this scenario you may need to do at least a minimum amount of response
    * processing within the adapter.
    *
+   * See also `groupRecordsForFindMany` and `coalesceFindRequests`
+   *
    * @method findMany [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
-   * @param schema
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {ModelSchema} schema An object with methods for accessing information about
+   *  the type, attributes and relationships of the primary type associated with the request.
    * @param ids
    * @param snapshots
+   * @return
    */
   findMany?(store: Store, schema: ModelSchema, ids: string[], snapshots: Snapshot[]): Promise<unknown>;
 
@@ -363,19 +418,24 @@ interface Adapter {
    * @method generateIdForRecord [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
+   * @param {Store} store The store service that initiated the request being normalized
    * @param modelName
    * @param properties
+   * @return
    */
   generateIdForRecord?(store: Store, modelName: string, properties: unknown): string;
 
   /**
    *
+   *
+   * See also `findMany` and `coalesceFindRequests`
+   *
    * @method groupRecordsForFindMany [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
+   * @param {Store} store The store service that initiated the request being normalized
    * @param snapshots
+   * @return
    */
   groupRecordsForFindMany?(store: Store, snapshots: Snapshot[]): Group[];
 
@@ -384,8 +444,8 @@ interface Adapter {
    * @method shouldReloadRecord [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
-   * @param {Snapshot} snapshot
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {Snapshot} snapshot A Snapshot containing the record's current data
    * @return {boolean} true if the record should be reloaded immediately, false otherwise
    */
   shouldReloadRecord?(store: Store, snapshot: Snapshot): boolean;
@@ -395,8 +455,8 @@ interface Adapter {
    * @method shouldReloadAll [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
-   * @param {Snapshot} snapshot
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {SnapshotRecordArray} snapshotArray
    * @return {boolean} true if the a new request for all records of the type in SnapshotRecordArray should be made immediately, false otherwise
    */
   shouldReloadAll?(store: Store, snapshotArray: SnapshotRecordArray): boolean;
@@ -406,8 +466,8 @@ interface Adapter {
    * @method shouldBackgroundReloadRecord [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
-   * @param {Snapshot} snapshot
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {Snapshot} snapshot A Snapshot containing the record's current data
    * @return {boolean} true if the record should be reloaded in the background, false otherwise
    */
   shouldBackgroundReloadRecord?(store: Store, snapshot: Snapshot): boolean;
@@ -417,13 +477,17 @@ interface Adapter {
    * @method shouldBackgroundReloadAll [OPTIONAL]
    * @public
    * @optional
-   * @param {Store} store
-   * @param {Snapshot} snapshot
+   * @param {Store} store The store service that initiated the request being normalized
+   * @param {SnapshotRecordArray} snapshotArray
    * @return {boolean} true if the a new request for all records of the type in SnapshotRecordArray should be made in the background, false otherwise
    */
   shouldBackgroundReloadAll?(store: Store, snapshotArray: SnapshotRecordArray): boolean;
 
   /**
+   * If your adapter implements `findMany`, setting this to `true` will cause `findRecord`
+   * requests triggered within the same `runloop` to be coalesced into one or more calls
+   * to `adapter.findMany`. The number of calls made and the records contained in each call
+   * can be tuned by your adapter's `groupRecordsForHasMany` method.
    *
    * @property coalesceFindRequests [OPTIONAL]
    * @public
