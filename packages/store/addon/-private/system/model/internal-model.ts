@@ -33,12 +33,10 @@ import { internalModelFactoryFor, setRecordIdentifier } from '../store/internal-
 import CoreStore from '../core-store';
 import coerceId from '../coerce-id';
 import recordDataFor from '../record-data-for';
-import { HAS_MODEL_PACKAGE } from '@ember-data/private-build-infra';
+import { HAS_MODEL_PACKAGE, HAS_RECORD_DATA_PACKAGE } from '@ember-data/private-build-infra';
 
 type DefaultRecordData = import('@ember-data/record-data/-private').RecordData;
 type RecordArray = InstanceType<typeof RecordArray>;
-type RelationshipRecordData = import('@ember-data/record-data/-private/ts-interfaces/relationship-record-data').RelationshipRecordData;
-type Relationships = import('@ember-data/record-data/-private/relationships/state/create').default;
 
 // move to TS hacks module that we can delete when this is no longer a necessary recast
 type ManyArray = InstanceType<typeof import('@ember-data/model/-private').ManyArray>;
@@ -48,18 +46,6 @@ type PromiseManyArray = InstanceType<typeof import('@ember-data/model/-private')
 /**
   @module @ember-data/store
 */
-
-// once the presentation logic is moved into the Model package we can make
-// eliminate these lossy and redundant helpers
-function relationshipsFor(instance: InternalModel): Relationships {
-  let recordData = recordDataFor(instance) as RelationshipRecordData;
-
-  return recordData._relationships;
-}
-
-function relationshipStateFor(instance: InternalModel, propertyName: string) {
-  return relationshipsFor(instance).get(propertyName);
-}
 
 const { hasOwnProperty } = Object.prototype;
 
@@ -1557,8 +1543,11 @@ export default class InternalModel {
     let reference = this.references[name];
 
     if (!reference) {
-      // TODO IGOR AND DAVID REFACTOR
-      let relationship = relationshipStateFor(this, name);
+      if (!HAS_RECORD_DATA_PACKAGE) {
+        throw new Error(`snapshot.belongsTo only supported for @ember-data/record-data`);
+      }
+      const relationshipStateFor = require('@ember-data/record-data/-private').relationshipStateFor;
+      const relationship = relationshipStateFor(this.store._storeWrapper, this.identifier, name);
 
       if (DEBUG && kind) {
         let modelName = this.modelName;

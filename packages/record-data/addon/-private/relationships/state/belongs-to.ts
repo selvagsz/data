@@ -49,20 +49,6 @@ export default class BelongsToRelationship extends Relationship {
     this.flushCanonicalLater();
   }
 
-  setInitialCanonicalIdentifier(identifier: StableRecordIdentifier) {
-    if (!identifier) {
-      return;
-    }
-
-    // When we initialize a belongsTo relationship, we want to avoid work like
-    // notifying our internalModel that we've "changed" and excessive thrash on
-    // setting up inverse relationships
-    this.canonicalMembers.add(identifier);
-    this.members.add(identifier);
-    this.inverseIdentifier = this.canonicalState = identifier;
-    this.setupInverseRelationship(identifier);
-  }
-
   addCanonicalIdentifier(identifier: StableRecordIdentifier) {
     if (this.canonicalMembers.has(identifier)) {
       return;
@@ -194,7 +180,7 @@ export default class BelongsToRelationship extends Relationship {
     return payload;
   }
 
-  updateData(data: ExistingResourceIdentifierObject, initial: boolean) {
+  updateData(data: ExistingResourceIdentifierObject) {
     let identifier;
     if (isNone(data)) {
       identifier = null;
@@ -211,10 +197,6 @@ export default class BelongsToRelationship extends Relationship {
     if (identifier !== null) {
       identifier = identifierCacheFor(this.store).getOrCreateRecordIdentifier(data);
     }
-    if (initial) {
-      this.setInitialCanonicalIdentifier(identifier);
-    } else {
-      this.setCanonicalIdentifier(identifier);
-    }
+    this.setCanonicalIdentifier(identifier);
   }
 }

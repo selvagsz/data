@@ -47,7 +47,7 @@ export default class Relationship {
   canonicalMembers: OrderedSet<StableRecordIdentifier>;
   store: CoreStore;
   storeWrapper: RecordDataStoreWrapper;
-  key: string | null;
+  key: string;
   inverseKey: string | null;
   isAsync: boolean;
   isPolymorphic: boolean;
@@ -80,7 +80,7 @@ export default class Relationship {
     this.canonicalMembers = new OrderedSet();
     this.storeWrapper = storeWrapper;
     this.store = storeWrapper._store;
-    this.key = relationshipMeta.key || null;
+    this.key = relationshipMeta.key || '--implicit';
     this.inverseKey = inverseKey;
     this.isAsync = typeof async === 'undefined' ? true : async;
     this.isPolymorphic = typeof polymorphic === 'undefined' ? false : polymorphic;
@@ -218,14 +218,6 @@ export default class Relationship {
     return !!(this.inverseKey && !this.inverseIsAsync);
   }
 
-  _hasSupportForImplicitRelationships(identifier: StableRecordIdentifier): boolean {
-    return true;
-  }
-
-  _hasSupportForRelationships(identifier: StableRecordIdentifier): boolean {
-    return true;
-  }
-
   get _inverseMeta(): RelationshipSchema {
     if (this.__inverseMeta === undefined) {
       let inverseMeta: RelationshipSchema | null = null;
@@ -256,11 +248,9 @@ export default class Relationship {
       if (!recordData) {
         return;
       }
-      if (!this._hasSupportForRelationships(inverseIdentifier)) {
-        return;
-      }
 
       let relationship = relationshipStateFor(this.storeWrapper, inverseIdentifier, inverseKey);
+      // DO we need to grab implicit inverse and do this?
 
       // For canonical members, it is possible that inverseIdentifier has already been associated to
       // to another record. For such cases, do not dematerialize the inverseIdentifier
@@ -374,20 +364,12 @@ export default class Relationship {
 
   setupInverseRelationship(identifier: StableRecordIdentifier) {
     if (this.inverseKey) {
-      if (!this._hasSupportForRelationships(identifier)) {
-        return;
-      }
       let relationship = relationshipStateFor(this.storeWrapper, identifier, this.inverseKey);
-      // if we have only just initialized the inverse relationship, then it
-      // already has this.identifier in its canonicalMembers, so skip the
-      // unnecessary work.  The exception to this is polymorphic
-      // relationships whose members are determined by their inverse, as those
-      // relationships cannot efficiently find their inverse payloads.
-      relationship.addCanonicalIdentifier(this.identifier);
-    } else {
-      if (!this._hasSupportForImplicitRelationships(identifier)) {
-        return;
+
+      if (relationship) {
+        relationship.addCanonicalIdentifier(this.identifier);
       }
+    } else {
       const relationships = implicitRelationshipsFor(this.storeWrapper, identifier);
       let relationship = relationships[this.inverseKeyForImplicit];
       if (!relationship) {
@@ -419,7 +401,7 @@ export default class Relationship {
         this.removeCanonicalIdentifierFromInverse(identifier);
       } else {
         const implicitRelationships = implicitRelationshipsFor(this.storeWrapper, identifier);
-        if (this._hasSupportForImplicitRelationships(identifier) && implicitRelationships[this.inverseKeyForImplicit]) {
+        if (implicitRelationships[this.inverseKeyForImplicit]) {
           implicitRelationships[this.inverseKeyForImplicit].removeCanonicalIdentifier(this.identifier);
         }
       }
@@ -431,22 +413,20 @@ export default class Relationship {
     if (!this.members.has(identifier)) {
       this.members.addWithIndex(identifier, idx);
       this.notifyRecordRelationshipAdded(identifier, idx);
-      if (this._hasSupportForRelationships(identifier) && this.inverseKey) {
+      if (this.inverseKey) {
         relationshipStateFor(this.storeWrapper, identifier, this.inverseKey).addIdentifier(this.identifier);
       } else {
-        if (this._hasSupportForImplicitRelationships(identifier)) {
-          const implicitRelationships = implicitRelationshipsFor(this.storeWrapper, identifier);
-          if (!implicitRelationships[this.inverseKeyForImplicit]) {
-            implicitRelationships[this.inverseKeyForImplicit] = new Relationship(
-              this.storeWrapper,
-              this.key,
-              { options: { async: this.isAsync } },
-              identifier,
-              this.isAsync
-            );
-          }
-          implicitRelationships[this.inverseKeyForImplicit].addIdentifier(this.identifier);
+        const implicitRelationships = implicitRelationshipsFor(this.storeWrapper, identifier);
+        if (!implicitRelationships[this.inverseKeyForImplicit]) {
+          implicitRelationships[this.inverseKeyForImplicit] = new Relationship(
+            this.storeWrapper,
+            this.key,
+            { options: { async: this.isAsync } },
+            identifier,
+            this.isAsync
+          );
         }
+        implicitRelationships[this.inverseKeyForImplicit].addIdentifier(this.identifier);
       }
     }
     this.setHasAnyRelationshipData(true);
@@ -459,7 +439,7 @@ export default class Relationship {
         this.removeIdentifierFromInverse(identifier);
       } else {
         const implicitRelationships = implicitRelationshipsFor(this.storeWrapper, identifier);
-        if (this._hasSupportForImplicitRelationships(identifier) && implicitRelationships[this.inverseKeyForImplicit]) {
+        if (implicitRelationships[this.inverseKeyForImplicit]) {
           implicitRelationships[this.inverseKeyForImplicit].removeIdentifier(this.identifier);
         }
       }
@@ -467,9 +447,6 @@ export default class Relationship {
   }
 
   removeIdentifierFromInverse(identifier: StableRecordIdentifier) {
-    if (!this._hasSupportForRelationships(identifier)) {
-      return;
-    }
     if (this.inverseKey) {
       let inverseRelationship = relationshipStateFor(this.storeWrapper, identifier, this.inverseKey);
       //Need to check for existence, as the record might unloading at the moment
@@ -484,9 +461,6 @@ export default class Relationship {
   }
 
   removeCanonicalIdentifierFromInverse(identifier: StableRecordIdentifier) {
-    if (!this._hasSupportForRelationships(identifier)) {
-      return;
-    }
     if (this.inverseKey) {
       let inverseRelationship = relationshipStateFor(this.storeWrapper, identifier, this.inverseKey);
       //Need to check for existence, as the record might unloading at the moment
@@ -524,7 +498,7 @@ export default class Relationship {
       unload = inverseIdentifier => {
         const id = inverseIdentifier.lid;
 
-        if (this._hasSupportForRelationships(inverseIdentifier) && seen[id] === undefined) {
+        if (seen[id] === undefined) {
           if (this.inverseKey) {
             const relationship = relationshipStateFor(this.storeWrapper, inverseIdentifier, this.inverseKey);
             relationship.removeCompletelyFromOwn(identifier);
@@ -536,7 +510,7 @@ export default class Relationship {
       unload = inverseIdentifier => {
         const id = inverseIdentifier.lid;
 
-        if (this._hasSupportForImplicitRelationships(inverseIdentifier) && seen[id] === undefined) {
+        if (seen[id] === undefined) {
           const relationship = implicitRelationshipStateFor(
             this.storeWrapper,
             inverseIdentifier,
@@ -643,7 +617,7 @@ export default class Relationship {
    `push` use `updateMeta`, `updateData` and `updateLink` to update the state
    of the relationship.
    */
-  push(payload: JsonApiRelationship, initial?: boolean) {
+  push(payload: JsonApiRelationship) {
     let hasRelationshipDataProperty = false;
     let hasLink = false;
 
@@ -653,12 +627,12 @@ export default class Relationship {
 
     if (payload.data !== undefined) {
       hasRelationshipDataProperty = true;
-      this.updateData(payload.data, initial);
+      this.updateData(payload.data);
     } else if (this.isAsync === false && !this.hasAnyRelationshipData) {
       hasRelationshipDataProperty = true;
       let data = this.kind === 'hasMany' ? [] : null;
 
-      this.updateData(data, initial);
+      this.updateData(data);
     }
 
     if (payload.links) {
@@ -712,27 +686,25 @@ export default class Relationship {
     } else if (hasLink) {
       this.setRelationshipIsStale(true);
 
-      if (!initial) {
-        let identifier = this.identifier;
-        let storeWrapper = this.storeWrapper;
-        if (CUSTOM_MODEL_CLASS) {
-          storeWrapper.notifyBelongsToChange(identifier.type, identifier.id, identifier.lid, this.key!);
-        } else {
-          storeWrapper.notifyPropertyChange(
-            identifier.type,
-            identifier.id,
-            identifier.lid,
-            // We know we are not an implicit relationship here
-            this.key!
-          );
-        }
+      let identifier = this.identifier;
+      let storeWrapper = this.storeWrapper;
+      if (CUSTOM_MODEL_CLASS) {
+        storeWrapper.notifyBelongsToChange(identifier.type, identifier.id, identifier.lid, this.key!);
+      } else {
+        storeWrapper.notifyPropertyChange(
+          identifier.type,
+          identifier.id,
+          identifier.lid,
+          // We know we are not an implicit relationship here
+          this.key!
+        );
       }
     }
   }
 
   localStateIsEmpty() {}
 
-  updateData(payload?, initial?) {}
+  updateData(payload?) {}
 
   destroy() {}
 }

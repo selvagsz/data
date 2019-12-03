@@ -7,16 +7,8 @@ import { get } from '@ember/object';
 import { assign } from '@ember/polyfills';
 import recordDataFor from './record-data-for';
 import { CUSTOM_MODEL_CLASS } from '@ember-data/canary-features';
-
-function relationshipsFor(instance) {
-  let recordData = recordDataFor(instance) || instance;
-
-  return recordData._relationships;
-}
-
-function relationshipStateFor(instance, propertyName) {
-  return relationshipsFor(instance).get(propertyName);
-}
+import { HAS_RECORD_DATA_PACKAGE } from '@ember-data/private-build-infra';
+import require from 'require';
 
 /**
   @class Snapshot
@@ -274,7 +266,12 @@ export default class Snapshot {
       );
     }
 
-    relationship = relationshipStateFor(this, keyName);
+    if (!HAS_RECORD_DATA_PACKAGE) {
+      throw new Error(`snapshot.belongsTo only supported for @ember-data/record-data`).relationshipStateFor;
+    }
+    const relationshipStateFor = require('@ember-data/record-data/-private').relationshipStateFor;
+
+    relationship = relationshipStateFor(this._store._storeWrapper, this._internalModel.identifier, keyName);
 
     let value = relationship.getData();
     let data = value && value.data;
@@ -352,7 +349,12 @@ export default class Snapshot {
       );
     }
 
-    relationship = relationshipStateFor(this, keyName);
+    if (!HAS_RECORD_DATA_PACKAGE) {
+      throw new Error(`snapshot.belongsTo only supported for @ember-data/record-data`).relationshipStateFor;
+    }
+    const relationshipStateFor = require('@ember-data/record-data/-private').relationshipStateFor;
+
+    relationship = relationshipStateFor(this._store._storeWrapper, this._internalModel.identifier, keyName);
 
     let value = relationship.getData();
 

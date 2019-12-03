@@ -11,6 +11,12 @@ export function graphFor(store: RecordDataStoreWrapper): Graph {
   let graph = Graphs.get(store);
   if (graph === undefined) {
     graph = new Graph(store);
+    const originalDestroy = store._store.destroy;
+    store._store.destroy = function() {
+      graph!.destroy();
+      Graphs.delete(store!);
+      return originalDestroy.call(this, ...arguments);
+    };
     Graphs.set(store, graph);
   }
   return graph;
@@ -45,6 +51,24 @@ export class Graph {
     return relationships;
   }
 
+  unload(identifier: StableRecordIdentifier) {
+    const relationships = this.identifiers.get(identifier);
+
+    if (relationships) {
+      // in an unload we go further
+      // cleanup doesn't mean the graph is invalid
+      relationships.forEach((name, rel) => destroyRelationship(rel));
+    }
+
+    const implicit = this.implicitMap.get(identifier);
+    if (implicit) {
+      Object.keys(implicit).forEach(key => {
+        let rel = implicit[key];
+        destroyRelationship(rel);
+      });
+    }
+  }
+
   push(identifier: StableRecordIdentifier, propertyName: string, payload: JsonApiRelationship) {
     const relationship = this.get(identifier).get(propertyName);
     const backburner = this.storeWrapper._store._backburner;
@@ -70,5 +94,29 @@ export class Graph {
     for (let i = 0; i < belongsTo.length; i += 2) {
       belongsTo[i].push(belongsTo[i + 1]);
     }
+  }
+
+  destroy() {
+    this.identifiers.clear();
+    this.implicitMap.clear();
+  }
+}
+
+// Handle dematerialization for relationship `rel`.  In all cases, notify the
+// relationship of the dematerialization: this is done so the relationship can
+// notify its inverse which needs to update state
+//
+// If the inverse is sync, unloading this record is treated as a client-side
+// delete, so we remove the inverse records from this relationship to
+// disconnect the graph.  Because it's not async, we don't need to keep around
+// the internalModel as an id-wrapper for references and because the graph is
+// disconnected we can actually destroy the internalModel when checking for
+// orphaned models.
+function destroyRelationship(rel) {
+  rel.identifierDidDematerialize();
+
+  if (rel._inverseIsSync()) {
+    rel.removeAllIdentifiersFromOwn();
+    rel.removeAllCanonicalIdentifiersFromOwn();
   }
 }

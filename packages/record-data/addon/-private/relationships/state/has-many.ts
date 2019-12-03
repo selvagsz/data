@@ -187,25 +187,6 @@ export default class ManyRelationship extends Relationship {
     }
   }
 
-  setInitialIdentifiers(identifiers: StableRecordIdentifier[] | undefined) {
-    if (Array.isArray(identifiers) === false || !identifiers || identifiers.length === 0) {
-      return;
-    }
-
-    for (let i = 0; i < identifiers.length; i++) {
-      let identifier = identifiers[i];
-      if (this.canonicalMembers.has(identifier)) {
-        continue;
-      }
-
-      this.canonicalMembers.add(identifier);
-      this.members.add(identifier);
-      this.setupInverseRelationship(identifier);
-    }
-
-    this.canonicalState = this.canonicalMembers.toArray();
-  }
-
   /*
     This is essentially a "sync" version of
       notifyHasManyChange. We should work to unify
@@ -246,7 +227,7 @@ export default class ManyRelationship extends Relationship {
     return payload;
   }
 
-  updateData(data, initial) {
+  updateData(data) {
     let identifiers: StableRecordIdentifier[] | undefined;
     if (isNone(data)) {
       identifiers = undefined;
@@ -257,11 +238,7 @@ export default class ManyRelationship extends Relationship {
         identifiers[i] = cache.getOrCreateRecordIdentifier(data[i]);
       }
     }
-    if (initial) {
-      this.setInitialIdentifiers(identifiers);
-    } else {
-      this.updateIdentifiersFromAdapter(identifiers);
-    }
+    this.updateIdentifiersFromAdapter(identifiers);
   }
 }
 

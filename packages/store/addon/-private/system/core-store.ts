@@ -224,7 +224,7 @@ abstract class CoreStore extends Service {
   public _notificationManager: NotificationManager;
   private _adapterCache = Object.create(null);
   private _serializerCache = Object.create(null);
-  private _storeWrapper = new RecordDataStoreWrapper(this);
+  public _storeWrapper = new RecordDataStoreWrapper(this);
 
   /*
     Ember Data uses several specialized micro-queues for organizing

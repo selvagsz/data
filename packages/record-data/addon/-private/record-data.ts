@@ -9,7 +9,6 @@ import { run } from '@ember/runloop';
 import coerceId from './coerce-id';
 import BelongsToRelationship from './relationships/state/belongs-to';
 import ManyRelationship from './relationships/state/has-many';
-import Relationship from './relationships/state/relationship';
 import { RecordData, ChangedAttributesHash } from '@ember-data/store/-private/ts-interfaces/record-data';
 import {
   JsonApiResource,
@@ -25,13 +24,13 @@ import { IDENTIFIERS, RECORD_DATA_ERRORS, RECORD_DATA_STATE } from '@ember-data/
 import { RecordIdentifier } from '@ember-data/store/-private/ts-interfaces/identifier';
 import { identifierCacheFor, recordDataFor } from '@ember-data/store/-private';
 import { graphFor } from './relationships/state/graph';
+import { implicitRelationshipsFor } from './record-data-for';
 type RecordDataStoreWrapper = import('@ember-data/store/-private/system/store/record-data-store-wrapper').default;
 
 let nextBfsId = 1;
 
 export default class RecordDataDefault implements RelationshipRecordData {
   _errors?: JsonApiValidationError[];
-  __implicitRelationships: { [key: string]: Relationship } | null;
   modelName: string;
   clientId: string;
   id: string | null;
@@ -73,7 +72,6 @@ export default class RecordDataDefault implements RelationshipRecordData {
       this.storeWrapper = storeWrapper;
     }
 
-    this.__implicitRelationships = null;
     this.isDestroyed = false;
     this._isNew = false;
     this._isDeleted = false;
@@ -206,7 +204,9 @@ export default class RecordDataDefault implements RelationshipRecordData {
 
         if (relationshipData.links) {
           let isAsync = relationshipMeta.options && relationshipMeta.options.async !== false;
-          let relationship = this._relationships.get(relationshipName);
+          let relationship = graphFor(this.storeWrapper)
+            .get(this.identifier)
+            .get(relationshipName);
           warn(
             `You pushed a record of type '${this.modelName}' with a relationship '${relationshipName}' configured as 'async: false'. You've included a link but no primary data, this may be an error in your payload. EmberData will treat this relationship as known-to-be-empty.`,
             isAsync || relationshipData.data || relationship.hasAnyRelationshipData,
@@ -369,27 +369,37 @@ export default class RecordDataDefault implements RelationshipRecordData {
 
   // get ResourceIdentifiers for "current state"
   getHasMany(key): DefaultCollectionResourceRelationship {
-    return (this._relationships.get(key) as ManyRelationship).getData();
+    return (graphFor(this.storeWrapper)
+      .get(this.identifier)
+      .get(key) as ManyRelationship).getData();
   }
 
   // set a new "current state" via ResourceIdentifiers
   setDirtyHasMany(key, recordDatas) {
-    let relationship = this._relationships.get(key);
+    let relationship = graphFor(this.storeWrapper)
+      .get(this.identifier)
+      .get(key);
     relationship.clear();
     relationship.addIdentifiers(recordDatas.map(r => r.identifier));
   }
 
   // append to "current state" via RecordDatas
   addToHasMany(key, recordDatas, idx) {
-    this._relationships.get(key).addIdentifiers(
-      recordDatas.map(r => r.identifier),
-      idx
-    );
+    graphFor(this.storeWrapper)
+      .get(this.identifier)
+      .get(key)
+      .addIdentifiers(
+        recordDatas.map(r => r.identifier),
+        idx
+      );
   }
 
   // remove from "current state" via RecordDatas
   removeFromHasMany(key, recordDatas) {
-    this._relationships.get(key).removeIdentifiers(recordDatas.map(r => r.identifier));
+    graphFor(this.storeWrapper)
+      .get(this.identifier)
+      .get(key)
+      .removeIdentifiers(recordDatas.map(r => r.identifier));
   }
 
   commitWasRejected(identifier?, errors?: JsonApiValidationError[]) {
@@ -412,11 +422,15 @@ export default class RecordDataDefault implements RelationshipRecordData {
   }
 
   getBelongsTo(key: string): DefaultSingleResourceRelationship {
-    return (this._relationships.get(key) as BelongsToRelationship).getData();
+    return (graphFor(this.storeWrapper)
+      .get(this.identifier)
+      .get(key) as BelongsToRelationship).getData();
   }
 
   setDirtyBelongsTo(key: string, recordData: RelationshipRecordData | null) {
-    (this._relationships.get(key) as BelongsToRelationship).setIdentifier(recordData ? recordData.identifier : null);
+    (graphFor(this.storeWrapper)
+      .get(this.identifier)
+      .get(key) as BelongsToRelationship).setIdentifier(recordData ? recordData.identifier : null);
   }
 
   setDirtyAttribute(key: string, value: any) {
@@ -460,7 +474,7 @@ export default class RecordDataDefault implements RelationshipRecordData {
     if (this.isDestroyed) {
       return;
     }
-    this._destroyRelationships();
+    graphFor(this.storeWrapper).unload(this.identifier);
     this.reset();
     if (!this._scheduledDestroy) {
       this._scheduledDestroy = run.backburner.schedule('destroy', this, '_cleanupOrphanedRecordDatas');
@@ -481,7 +495,6 @@ export default class RecordDataDefault implements RelationshipRecordData {
   }
 
   destroy() {
-    this._relationships.forEach((name, rel) => rel.destroy());
     this.isDestroyed = true;
     this.storeWrapper.disconnectRecord(this.modelName, this.id, this.clientId);
   }
@@ -501,15 +514,17 @@ export default class RecordDataDefault implements RelationshipRecordData {
   _directlyRelatedRecordDatas(): RecordData[] {
     let array = [];
 
-    this._relationships.forEach((name, rel) => {
-      let members = rel.members.list.map(identifier => {
-        return recordDataFor(identifier);
+    graphFor(this.storeWrapper)
+      .get(this.identifier)
+      .forEach((name, rel) => {
+        let members = rel.members.list.map(identifier => {
+          return recordDataFor(identifier);
+        });
+        let canonicalMembers = rel.canonicalMembers.list.map(identifier => {
+          return recordDataFor(identifier);
+        });
+        array = array.concat(members, canonicalMembers);
       });
-      let canonicalMembers = rel.canonicalMembers.list.map(identifier => {
-        return recordDataFor(identifier);
-      });
-      array = array.concat(members, canonicalMembers);
-    });
     return array;
   }
 
@@ -618,9 +633,6 @@ export default class RecordDataDefault implements RelationshipRecordData {
    would have a implicit post relationship in order to be do things like remove ourselves from the post
    when we are deleted
   */
-  get _implicitRelationships() {
-    return graphFor(this.storeWrapper).getImplicit(this.identifier);
-  }
 
   get _inFlightAttributes() {
     if (this.__inFlightAttributes === null) {
@@ -649,7 +661,7 @@ export default class RecordDataDefault implements RelationshipRecordData {
       let { modelName, storeWrapper } = this;
       let attributeDefs = storeWrapper.attributesDefinitionFor(modelName);
       let relationshipDefs = storeWrapper.relationshipsDefinitionFor(modelName);
-      let relationships = this._relationships;
+      let relationships = graphFor(storeWrapper).get(this.identifier);
       let propertyNames = Object.keys(options);
 
       for (let i = 0; i < propertyNames.length; i++) {
@@ -708,15 +720,16 @@ export default class RecordDataDefault implements RelationshipRecordData {
     @private
    */
   removeFromInverseRelationships(isNew = false) {
-    this._relationships.forEach((name, rel) => {
-      rel.removeCompletelyFromInverse();
-      if (isNew === true) {
-        rel.clear();
-      }
-    });
+    graphFor(this.storeWrapper)
+      .get(this.identifier)
+      .forEach((name, rel) => {
+        rel.removeCompletelyFromInverse();
+        if (isNew === true) {
+          rel.clear();
+        }
+      });
 
-    let implicitRelationships = this._implicitRelationships;
-    this.__implicitRelationships = null;
+    let implicitRelationships = implicitRelationshipsFor(this.storeWrapper, this.identifier);
 
     Object.keys(implicitRelationships).forEach(key => {
       let rel = implicitRelationships[key];
@@ -725,18 +738,6 @@ export default class RecordDataDefault implements RelationshipRecordData {
       if (isNew === true) {
         rel.clear();
       }
-    });
-  }
-
-  _destroyRelationships() {
-    let relationships = this._relationships;
-    relationships.forEach((name, rel) => destroyRelationship(rel));
-
-    let implicitRelationships = this._implicitRelationships;
-    this.__implicitRelationships = null;
-    Object.keys(implicitRelationships).forEach(key => {
-      let rel = implicitRelationships[key];
-      destroyRelationship(rel);
     });
   }
 
@@ -860,25 +861,6 @@ function assertRelationshipData(store, recordData, data, meta) {
     `Encountered a relationship identifier with type '${data.type}' for the ${meta.kind} relationship '${meta.key}' on ${recordData}, Expected a json-api identifier with type '${meta.type}'. No model was found for '${data.type}'.`,
     data === null || !data.type || store._hasModelFor(data.type)
   );
-}
-
-// Handle dematerialization for relationship `rel`.  In all cases, notify the
-// relationship of the dematerialization: this is done so the relationship can
-// notify its inverse which needs to update state
-//
-// If the inverse is sync, unloading this record is treated as a client-side
-// delete, so we remove the inverse records from this relationship to
-// disconnect the graph.  Because it's not async, we don't need to keep around
-// the internalModel as an id-wrapper for references and because the graph is
-// disconnected we can actually destroy the internalModel when checking for
-// orphaned models.
-function destroyRelationship(rel) {
-  rel.identifierDidDematerialize();
-
-  if (rel._inverseIsSync()) {
-    rel.removeAllIdentifiersFromOwn();
-    rel.removeAllCanonicalIdentifiersFromOwn();
-  }
 }
 
 function areAllModelsUnloaded(recordDatas) {
