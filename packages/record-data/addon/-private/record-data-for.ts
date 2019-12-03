@@ -1,27 +1,38 @@
-import { recordDataFor } from '@ember-data/store/-private';
 import Relationships from './relationships/state/create';
 import Relationship from './relationships/state/relationship';
 import BelongsToRelationship from './relationships/state/belongs-to';
 import ManyRelationship from './relationships/state/has-many';
-import { ConfidentDict } from '@ember-data/store/-private/ts-interfaces/utils';
-import { RelationshipRecordData } from './ts-interfaces/relationship-record-data';
+import { graphFor } from './relationships/state/graph';
+type RecordDataStoreWrapper = import('@ember-data/store/addon/-private/ts-interfaces/record-data-store-wrapper').RecordDataStoreWrapper;
+type StableRecordIdentifier = import('@ember-data/store/-private/ts-interfaces/identifier').StableRecordIdentifier;
+type RelationshipDict = import('@ember-data/store/-private/ts-interfaces/utils').ConfidentDict<Relationship>;
 
-export function relationshipsFor(instance: any): Relationships {
-  let recordData = (recordDataFor(instance) || instance) as RelationshipRecordData;
-
-  return recordData._relationships;
+export function relationshipsFor(
+  storeWrapper: RecordDataStoreWrapper,
+  identifier: StableRecordIdentifier
+): Relationships {
+  return graphFor(storeWrapper).get(identifier);
 }
 
-export function relationshipStateFor(instance: any, propertyName: string): BelongsToRelationship | ManyRelationship {
-  return relationshipsFor(instance).get(propertyName);
+export function relationshipStateFor(
+  storeWrapper: RecordDataStoreWrapper,
+  identifier: StableRecordIdentifier,
+  propertyName: string
+): BelongsToRelationship | ManyRelationship {
+  return relationshipsFor(storeWrapper, identifier).get(propertyName);
 }
 
-export function implicitRelationshipsFor(instance: any): ConfidentDict<Relationship> {
-  let recordData = (recordDataFor(instance) || instance) as RelationshipRecordData;
-
-  return recordData._implicitRelationships;
+export function implicitRelationshipsFor(
+  storeWrapper: RecordDataStoreWrapper,
+  identifier: StableRecordIdentifier
+): RelationshipDict {
+  return graphFor(storeWrapper).getImplicit(identifier);
 }
 
-export function implicitRelationshipStateFor(instance: any, propertyName: string): Relationship {
-  return implicitRelationshipsFor(instance)[propertyName];
+export function implicitRelationshipStateFor(
+  storeWrapper: RecordDataStoreWrapper,
+  identifier: StableRecordIdentifier,
+  propertyName: string
+): Relationship {
+  return implicitRelationshipsFor(storeWrapper, identifier)[propertyName];
 }

@@ -6,7 +6,6 @@ import { assign } from '@ember/polyfills';
 import { isEqual } from '@ember/utils';
 import { assert, warn, inspect } from '@ember/debug';
 import { run } from '@ember/runloop';
-import Relationships from './relationships/state/create';
 import coerceId from './coerce-id';
 import BelongsToRelationship from './relationships/state/belongs-to';
 import ManyRelationship from './relationships/state/has-many';
@@ -25,12 +24,13 @@ import { RelationshipRecordData } from './ts-interfaces/relationship-record-data
 import { RecordDataStoreWrapper } from '@ember-data/store/-private/ts-interfaces/record-data-store-wrapper';
 import { IDENTIFIERS, RECORD_DATA_ERRORS, RECORD_DATA_STATE } from '@ember-data/canary-features';
 import { RecordIdentifier } from '@ember-data/store/-private/ts-interfaces/identifier';
+import { identifierCacheFor, recordDataFor } from '@ember-data/store/-private';
+import { graphFor } from './relationships/state/graph';
 
 let nextBfsId = 1;
 
 export default class RecordDataDefault implements RelationshipRecordData {
   _errors?: JsonApiValidationError[];
-  __relationships: Relationships | null;
   __implicitRelationships: { [key: string]: Relationship } | null;
   modelName: string;
   clientId: string;
@@ -44,7 +44,7 @@ export default class RecordDataDefault implements RelationshipRecordData {
   _scheduledDestroy: any;
   _isDeleted: boolean;
   _isDeletionCommited: boolean;
-  private identifier: RecordIdentifier;
+  public identifier: RecordIdentifier;
   public storeWrapper: RecordDataStoreWrapper;
 
   constructor(identifier: RecordIdentifier, storeWrapper: RecordDataStoreWrapper);
@@ -62,13 +62,17 @@ export default class RecordDataDefault implements RelationshipRecordData {
       this.storeWrapper = storeWrapper;
     } else {
       const [modelName, id, clientId, storeWrapper] = arguments;
+      this.identifier = identifierCacheFor(storeWrapper._store).getOrCreateRecordIdentifier({
+        type: modelName,
+        id,
+        lid: clientId,
+      });
       this.modelName = modelName;
       this.clientId = clientId;
       this.id = id;
       this.storeWrapper = storeWrapper;
     }
 
-    this.__relationships = null;
     this.__implicitRelationships = null;
     this.isDestroyed = false;
     this._isNew = false;
@@ -374,17 +378,20 @@ export default class RecordDataDefault implements RelationshipRecordData {
   setDirtyHasMany(key, recordDatas) {
     let relationship = this._relationships.get(key);
     relationship.clear();
-    relationship.addRecordDatas(recordDatas);
+    relationship.addIdentifiers(recordDatas.map(r => r.identifier));
   }
 
   // append to "current state" via RecordDatas
   addToHasMany(key, recordDatas, idx) {
-    this._relationships.get(key).addRecordDatas(recordDatas, idx);
+    this._relationships.get(key).addIdentifiers(
+      recordDatas.map(r => r.identifier),
+      idx
+    );
   }
 
   // remove from "current state" via RecordDatas
   removeFromHasMany(key, recordDatas) {
-    this._relationships.get(key).removeRecordDatas(recordDatas);
+    this._relationships.get(key).removeIdentifiers(recordDatas.map(r => r.identifier));
   }
 
   commitWasRejected(identifier?, errors?: JsonApiValidationError[]) {
@@ -410,8 +417,8 @@ export default class RecordDataDefault implements RelationshipRecordData {
     return (this._relationships.get(key) as BelongsToRelationship).getData();
   }
 
-  setDirtyBelongsTo(key: string, recordData: RelationshipRecordData) {
-    (this._relationships.get(key) as BelongsToRelationship).setRecordData(recordData);
+  setDirtyBelongsTo(key: string, recordData: RelationshipRecordData | null) {
+    (this._relationships.get(key) as BelongsToRelationship).setIdentifier(recordData ? recordData.identifier : null);
   }
 
   setDirtyAttribute(key: string, value: any) {
@@ -497,8 +504,12 @@ export default class RecordDataDefault implements RelationshipRecordData {
     let array = [];
 
     this._relationships.forEach((name, rel) => {
-      let members = rel.members.list;
-      let canonicalMembers = rel.canonicalMembers.list;
+      let members = rel.members.list.map(identifier => {
+        return recordDataFor(identifier);
+      });
+      let canonicalMembers = rel.canonicalMembers.list.map(identifier => {
+        return recordDataFor(identifier);
+      });
       array = array.concat(members, canonicalMembers);
     });
     return array;
@@ -529,7 +540,7 @@ export default class RecordDataDefault implements RelationshipRecordData {
       for (let i = 0; i < related.length; ++i) {
         let recordData = related[i];
 
-        if (recordData instanceof RecordDataDefault) {
+        if (recordData && recordData instanceof RecordDataDefault) {
           assert('Internal Error: seen a future bfs iteration', recordData._bfsId <= bfsId);
           if (recordData._bfsId < bfsId) {
             queue.push(recordData);
@@ -568,11 +579,7 @@ export default class RecordDataDefault implements RelationshipRecordData {
   }
 
   get _relationships() {
-    if (this.__relationships === null) {
-      this.__relationships = new Relationships(this);
-    }
-
-    return this.__relationships;
+    return graphFor(this.storeWrapper).get(this.identifier);
   }
 
   get _data() {
@@ -614,12 +621,7 @@ export default class RecordDataDefault implements RelationshipRecordData {
    when we are deleted
   */
   get _implicitRelationships() {
-    if (this.__implicitRelationships === null) {
-      let relationships = Object.create(null);
-      this.__implicitRelationships = relationships;
-      return relationships;
-    }
-    return this.__implicitRelationships;
+    return graphFor(this.storeWrapper).getImplicit(this.identifier);
   }
 
   get _inFlightAttributes() {
@@ -873,11 +875,11 @@ function assertRelationshipData(store, recordData, data, meta) {
 // disconnected we can actually destroy the internalModel when checking for
 // orphaned models.
 function destroyRelationship(rel) {
-  rel.recordDataDidDematerialize();
+  rel.identifierDidDematerialize();
 
   if (rel._inverseIsSync()) {
-    rel.removeAllRecordDatasFromOwn();
-    rel.removeAllCanonicalRecordDatasFromOwn();
+    rel.removeAllIdentifiersFromOwn();
+    rel.removeAllCanonicalIdentifiersFromOwn();
   }
 }
 

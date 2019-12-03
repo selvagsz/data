@@ -27,7 +27,7 @@ import { promiseArray, promiseObject } from './promise-proxies';
 import { _bind, _guard, _objectIsAlive, guardDestroyedStore } from './store/common';
 
 import { normalizeResponseHelper } from './store/serializer-response';
-import recordDataFor from './record-data-for';
+import recordDataFor, { setRecordDataFor } from './record-data-for';
 import FetchManager, { SaveOp } from './fetch-manager';
 
 import { _find, _findMany, _findHasMany, _findBelongsTo, _findAll, _query, _queryRecord } from './store/finders';
@@ -3083,7 +3083,11 @@ abstract class CoreStore extends Service {
    * @internal
    */
   _createRecordData(identifier: StableRecordIdentifier): RecordData {
-    return this.createRecordDataFor(identifier.type, identifier.id, identifier.lid, this._storeWrapper);
+    const recordData = this.createRecordDataFor(identifier.type, identifier.id, identifier.lid, this._storeWrapper);
+
+    setRecordDataFor(identifier, recordData);
+
+    return recordData;
   }
 
   /**

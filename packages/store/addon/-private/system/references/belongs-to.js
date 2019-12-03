@@ -1,7 +1,6 @@
 import { resolve } from 'rsvp';
 import { assertPolymorphicType } from '@ember-data/store/-debug';
 import Reference from './reference';
-import recordDataFor from '../record-data-for';
 import { peekRecordIdentifier } from '../store/internal-model-factory';
 
 /**
@@ -143,7 +142,7 @@ export default class BelongsToReference extends Reference {
       );
 
       //TODO Igor cleanup, maybe move to relationship push
-      this.belongsToRelationship.setCanonicalRecordData(recordDataFor(record));
+      this.belongsToRelationship.setCanonicalIdentifier(peekRecordIdentifier(record));
 
       return record;
     });

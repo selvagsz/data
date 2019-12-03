@@ -1,5 +1,7 @@
 import { RelationshipsSchema, AttributesSchema } from './record-data-schemas';
 import { BRAND_SYMBOL } from './utils/brand';
+import { RecordData } from './record-data';
+import { RelationshipRecordData } from '@ember-data/record-data/-private/ts-interfaces/relationship-record-data';
 
 /**
   @module @ember-data/store
@@ -38,7 +40,9 @@ export interface RecordDataStoreWrapper {
   notifyHasManyChange(modelName: string, id: string, clientId: string | null | undefined, key: string): void;
   notifyHasManyChange(modelName: string, id: string | null, clientId: string | null | undefined, key: string): void;
 
-  recordDataFor(modelName: string, id: string, clientId?: string): unknown;
+  recordDataFor(modelName: string, id: string, clientId?: null | string): RecordData | RelationshipRecordData;
+  recordDataFor(modelName: string, id: null, clientId: string): RecordData | RelationshipRecordData;
+  recordDataFor(modelName: string, id: string | null, clientId?: null | string): RecordData | RelationshipRecordData;
 
   notifyBelongsToChange(modelName: string, id: string | null, clientId: string, key: string): void;
   notifyBelongsToChange(modelName: string, id: string, clientId: string | null | undefined, key: string): void;
