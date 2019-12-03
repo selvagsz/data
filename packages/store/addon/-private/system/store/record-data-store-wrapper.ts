@@ -9,6 +9,17 @@ import { identifierCacheFor, IdentifierCache } from '../../identifiers/cache';
 import CoreStore from '../core-store';
 import constructResource from '../../utils/construct-resource';
 import { StableRecordIdentifier } from '../../ts-interfaces/identifier';
+import { HAS_RECORD_DATA_PACKAGE } from '@ember-data/private-build-infra';
+import require from 'require';
+
+let peekGraph;
+if (HAS_RECORD_DATA_PACKAGE) {
+  let _peekGraph;
+  peekGraph = wrapper => {
+    _peekGraph = _peekGraph || require('@ember-data/record-data/-private').peekGraph;
+    return _peekGraph(wrapper);
+  };
+}
 
 /**
   @module @ember-data/store
@@ -221,9 +232,24 @@ export default class RecordDataStoreWrapper implements IRecordDataStoreWrapper {
   disconnectRecord(type: string, id: string | null, lid?: string | null): void {
     const resource = constructResource(type, id, lid);
     const identifier = identifierCacheFor(this._store).getOrCreateRecordIdentifier(resource);
+    if (HAS_RECORD_DATA_PACKAGE) {
+      let graph = peekGraph(this);
+      if (graph) {
+        graph.unload(identifier);
+      }
+    }
     let internalModel = internalModelFactoryFor(this._store).peek(identifier);
     if (internalModel) {
       internalModel.destroyFromRecordData();
+    }
+  }
+
+  destroy() {
+    if (HAS_RECORD_DATA_PACKAGE) {
+      let graph = peekGraph(this);
+      if (graph) {
+        graph.destroy();
+      }
     }
   }
 }

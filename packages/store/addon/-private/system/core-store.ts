@@ -3465,6 +3465,7 @@ abstract class CoreStore extends Service {
     identifierCacheFor(this).destroy();
 
     this.unloadAll();
+    this._storeWrapper.destroy();
 
     if (DEBUG) {
       unregisterWaiter(this.__asyncWaiter);

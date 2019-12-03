@@ -7,16 +7,14 @@ import { JsonApiRelationship } from '@ember-data/store/-private/ts-interfaces/re
 
 const Graphs = new WeakMap<RecordDataStoreWrapper, Graph>();
 
+export function peekGraph(store: RecordDataStoreWrapper): Graph | undefined {
+  return Graphs.get(store);
+}
+
 export function graphFor(store: RecordDataStoreWrapper): Graph {
   let graph = Graphs.get(store);
   if (graph === undefined) {
     graph = new Graph(store);
-    const originalDestroy = store._store.destroy;
-    store._store.destroy = function() {
-      graph!.destroy();
-      Graphs.delete(store!);
-      return originalDestroy.call(this, ...arguments);
-    };
     Graphs.set(store, graph);
   }
   return graph;
@@ -99,6 +97,8 @@ export class Graph {
   destroy() {
     this.identifiers.clear();
     this.implicitMap.clear();
+    Graphs.delete(this.storeWrapper);
+    this.storeWrapper = (null as unknown) as RecordDataStoreWrapper;
   }
 }
 
