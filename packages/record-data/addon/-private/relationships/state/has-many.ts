@@ -178,13 +178,18 @@ export default class ManyRelationship extends Relationship {
 
     for (let i = 0, l = identifiers.length; i < l; i++) {
       let identifier = identifiers[i];
-      // TODO this check causes two failures
-      // but ought to be safe and save us some work
-      // if (members.list[i] !== identifier) {
-      this.removeCanonicalIdentifier(identifier);
-      this.addCanonicalIdentifier(identifier, i);
-      // }
+
+      if (members.list[i] !== identifier) {
+        this.removeCanonicalIdentifier(identifier);
+        this.addCanonicalIdentifier(identifier, i);
+      }
     }
+    // TODO this flush is here because we may not have triggered one above
+    // due to the index guard on the remove+add pattern.
+    //
+    // while not doing this flush is actually an improvement, for semantics we
+    // have to preserve the flush cannonical to "lose" local changes
+    this.flushCanonicalLater();
   }
 
   /*
