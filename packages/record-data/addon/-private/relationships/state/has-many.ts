@@ -19,7 +19,7 @@ export default class ManyRelationship extends Relationship {
   _willUpdateManyArray: boolean;
   _pendingManyArrayUpdates: any;
   key: string;
-  kind: 'hasMany';
+  kind: 'hasMany' = 'hasMany';
 
   constructor(
     store: any,
@@ -178,8 +178,12 @@ export default class ManyRelationship extends Relationship {
 
     for (let i = 0, l = identifiers.length; i < l; i++) {
       let identifier = identifiers[i];
+      // TODO this check causes two failures
+      // but ought to be safe and save us some work
+      // if (members.list[i] !== identifier) {
       this.removeCanonicalIdentifier(identifier);
       this.addCanonicalIdentifier(identifier, i);
+      // }
     }
   }
 

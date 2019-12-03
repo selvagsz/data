@@ -6,15 +6,14 @@ import { DefaultSingleResourceRelationship } from '../../ts-interfaces/relations
 import { RelationshipSchema } from '@ember-data/store/-private/ts-interfaces/record-data-schemas';
 import { ExistingResourceIdentifierObject } from '@ember-data/store/-private/ts-interfaces/ember-data-json-api';
 import { StableRecordIdentifier } from '@ember-data/store/-private/ts-interfaces/identifier';
-
 import { isNew } from './relationship';
 import { identifierCacheFor } from '@ember-data/store/-private';
 
 export default class BelongsToRelationship extends Relationship {
   inverseIdentifier: StableRecordIdentifier | null;
   canonicalState: StableRecordIdentifier | null;
+  kind: 'belongsTo' = 'belongsTo';
   key: string;
-  kind: 'belongsTo';
 
   constructor(
     store: any,
@@ -24,7 +23,6 @@ export default class BelongsToRelationship extends Relationship {
     inverseIsAsync: boolean
   ) {
     super(store, inverseKey, relationshipMeta, identifier, inverseIsAsync);
-    this.key = relationshipMeta.key;
     this.inverseIdentifier = null;
     this.canonicalState = null;
     this.key = relationshipMeta.key;

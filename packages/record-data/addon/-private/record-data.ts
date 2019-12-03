@@ -21,11 +21,11 @@ import {
   DefaultCollectionResourceRelationship,
 } from './ts-interfaces/relationship-record-data';
 import { RelationshipRecordData } from './ts-interfaces/relationship-record-data';
-import { RecordDataStoreWrapper } from '@ember-data/store/-private/ts-interfaces/record-data-store-wrapper';
 import { IDENTIFIERS, RECORD_DATA_ERRORS, RECORD_DATA_STATE } from '@ember-data/canary-features';
 import { RecordIdentifier } from '@ember-data/store/-private/ts-interfaces/identifier';
 import { identifierCacheFor, recordDataFor } from '@ember-data/store/-private';
 import { graphFor } from './relationships/state/graph';
+type RecordDataStoreWrapper = import('@ember-data/store/-private/system/store/record-data-store-wrapper').default;
 
 let nextBfsId = 1;
 
@@ -243,9 +243,7 @@ export default class RecordDataDefault implements RelationshipRecordData {
         }
       }
 
-      let relationship = this._relationships.get(relationshipName);
-
-      relationship.push(relationshipData);
+      graphFor(this.storeWrapper).push(this.identifier, relationshipName, relationshipData);
     }
   }
 

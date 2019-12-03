@@ -3,7 +3,7 @@ import BelongsToRelationship from './belongs-to';
 
 import { RelationshipSchema } from '@ember-data/store/-private/ts-interfaces/record-data-schemas';
 type StableRecordIdentifier = import('@ember-data/store/-private/ts-interfaces/identifier').StableRecordIdentifier;
-type RecordDataStoreWrapper = import('@ember-data/store/addon/-private/ts-interfaces/record-data-store-wrapper').RecordDataStoreWrapper;
+type RecordDataStoreWrapper = import('@ember-data/store/-private/ts-interfaces/record-data-store-wrapper').RecordDataStoreWrapper;
 type Graph = import('./graph').Graph;
 
 function createRelationshipFor(

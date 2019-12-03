@@ -4,7 +4,7 @@ import RSVP, { resolve } from 'rsvp';
 import { module, test } from 'qunit';
 import JSONAPIAdapter from '@ember-data/adapter/json-api';
 import JSONAPISerializer from '@ember-data/serializer/json-api';
-import { setupTest } from 'ember-qunit';
+import { setupTest, skip } from 'ember-qunit';
 import Store from '@ember-data/store';
 import Model from '@ember-data/model';
 import testInDebug from '@ember-data/unpublished-test-infra/test-support/test-in-debug';
@@ -2001,12 +2001,10 @@ module('integration/relationship/belongs_to Belongs-To Relationships', function(
     assert.equal(count, 0);
   });
 
-  test("belongsTo relationship doesn't trigger when model data doesn't support implicit relationship", function(assert) {
+  skip("belongsTo relationship doesn't trigger when model data doesn't support implicit relationship", function(assert) {
     class TestRecordData extends RecordData {
       constructor(...args) {
         super(...args);
-        delete this.__implicitRelationships;
-        delete this.__relationships;
       }
 
       _destroyRelationships() {}
@@ -2022,13 +2020,6 @@ module('integration/relationship/belongs_to Belongs-To Relationships', function(
       destroy() {
         this.isDestroyed = true;
         this.storeWrapper.disconnectRecord(this.modelName, this.id, this.clientId);
-      }
-
-      get _implicitRelationships() {
-        return undefined;
-      }
-      get _relationships() {
-        return undefined;
       }
     }
 

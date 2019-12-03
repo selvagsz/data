@@ -10,6 +10,7 @@ import { Promise, resolve, reject } from 'rsvp';
 import { ServerError } from '@ember-data/adapter/error';
 import Ember from 'ember';
 import { attr, hasMany, belongsTo } from '@ember-data/model';
+import { implicitRelationshipsFor } from '@ember-data/record-data/-private';
 
 class Person extends Model {
   @attr()
@@ -239,6 +240,9 @@ module('async belongs-to rendering tests', function(hooks) {
           attributes: { name: 'Pete' },
         },
       });
+      const storeWrapper = pete._internalModel._recordData.storeWrapper;
+      const identifier = pete._internalModel.identifier;
+      const implicitRelationships = implicitRelationshipsFor(storeWrapper, identifier);
 
       const goofy = store.push({
         data: {
@@ -253,7 +257,7 @@ module('async belongs-to rendering tests', function(hooks) {
         },
       });
 
-      assert.equal(pete._internalModel.__recordData.__implicitRelationships.undefinedpetOwner.canonicalMembers.size, 1);
+      assert.equal(implicitRelationships.undefinedpetOwner.canonicalMembers.size, 1);
 
       const tweety = store.push({
         data: {
@@ -268,7 +272,7 @@ module('async belongs-to rendering tests', function(hooks) {
         },
       });
 
-      assert.equal(pete._internalModel.__recordData.__implicitRelationships.undefinedpetOwner.canonicalMembers.size, 2);
+      assert.equal(implicitRelationships.undefinedpetOwner.canonicalMembers.size, 2);
 
       let petOwner = await goofy.get('petOwner');
       assert.equal(petOwner.get('name'), 'Pete');
@@ -282,7 +286,7 @@ module('async belongs-to rendering tests', function(hooks) {
       await tweety.destroyRecord();
       assert.ok(tweety.isDeleted);
 
-      assert.equal(pete._internalModel.__recordData.__implicitRelationships.undefinedpetOwner.canonicalMembers.size, 0);
+      assert.equal(implicitRelationships.undefinedpetOwner.canonicalMembers.size, 0);
 
       const jerry = store.push({
         data: {
@@ -300,7 +304,7 @@ module('async belongs-to rendering tests', function(hooks) {
       petOwner = await jerry.get('petOwner');
       assert.equal(petOwner.get('name'), 'Pete');
 
-      assert.equal(pete._internalModel.__recordData.__implicitRelationships.undefinedpetOwner.canonicalMembers.size, 1);
+      assert.equal(implicitRelationships.undefinedpetOwner.canonicalMembers.size, 1);
 
       await settled();
     });
