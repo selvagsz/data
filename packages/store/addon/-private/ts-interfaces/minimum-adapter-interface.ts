@@ -1,10 +1,10 @@
+type Dict<T> = import('./utils').Dict<T>;
 type Snapshot = import('../system/snapshot').default;
 type SnapshotRecordArray = import('../system/snapshot-record-array').default;
 type Store = import('../system/core-store').default;
 type ModelSchema = import('../ts-interfaces/ds-model').ModelSchema;
 type AdapterPopulatedRecordArray = import('../system/record-arrays/adapter-populated-record-array').default;
 type RelationshipSchema = import('./record-data-schemas').RelationshipSchema;
-import { Dict } from './utils';
 
 type Group = Snapshot[];
 
